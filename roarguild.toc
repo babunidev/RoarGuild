@@ -1,5 +1,6 @@
 ## Interface: 11200
 ## Title: RoarGuild
+## Author: Babuni.dev
 ## Notes: Battle-emote triggers, guild recruitment messages, and the shared Roarboard message board.
 ## Version: 1.33
 ## SavedVariables: ROGUDB
