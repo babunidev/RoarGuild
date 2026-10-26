@@ -1,128 +1,91 @@
-**🦁 RoarGuild Addon**
+# RoarGuild — characters are stories in motion
 
-**Version:** 1.33
-**Author:** Babuni.dev
-**Environment:** Vanilla WoW 1.12 (Lua 5.0)
+**Creator and project author:** Babuni.dev  
+**Current version:** 1.33  
+**Target declared by manifest:** World of Warcraft 1.12 / interface `11200`  
+**Primary files:** `roarguild.lua`, `roarguild.toc`  
+**Verification status:** Source and Git history inspected 2026-10-26; live-client behavior not retested.
 
-RoarGuild adds a small chance for your character to /roar when pressing actionslots, with the option to fully customize every actionslot with it's own chance, timer and list of emotes. 
+**RoarGuild** is a World of Warcraft character-expression and community addon. It connects three kinds of experience: action-button-driven emotes, welcoming recruitment language for the ROAR guild, and **Roarboard**, a peer-shared message board. The original creative description gives its center of gravity:
 
-RoarGuild is flavor-first, fun feature addon that aims to bring a bit of life to the world.
+> RoarGuild is not about optimization. It is about presence.
 
-It also acts as a tool for roar-guildmembers to recruit new members by sending roar-guild flavored welcome messages to a chosen chat -channel.
+**Characters are not loadouts. They are stories in motion.** An ordinary action-bar press may produce a spontaneous emote without changing the player's intended action. Players can configure independent instances and emote selections, while rare global fallback roars and optional reminders add a little unpredictability.
 
-It includes **Roarboard**, a lightweight shared guild message board. Use `/roarboard <message>` to post, `/roarboard` to open it, and `/roarboard sync` to request a resync through the `roarboard` channel. Posts are kept for seven days after their last activity; clicking **Roar** on a post adds a reaction and refreshes that activity.
+## Install
 
-━━━━━━━━━━━━━━━━━━
+Place the committed `roarguild.lua` and `roarguild.toc` inside `Interface/AddOns/roarguild/`; restart the client and enable **RoarGuild**. The TOC loads `roarguild.lua` and declares the account-wide SavedVariables table `ROGUDB`.
 
-**What It Does**
+The source targets 1.12-era Lua APIs but actual compatibility and coexistence with other `UseAction` wrappers have not been verified in this audit.
 
-**RoarGuild**
+## The action-triggered emote system (`/rogu`)
 
-* Hooks directly into real action bar presses
-* Uses *instances* bound to specific action bar slots
-* Each instance has its own cooldown, chance, and emote pool
-* Emotes are fully configurable, add/remove
-* A shared **master emote list** is maintained per account
-* Each instance can randomly pick from multiple assigned emotes
-* Default and guaranteed fallback emote is **ROAR**
-* Includes an independent **global fallback trigger**
+1. Type `/rogu watch`, press a button, and note its physical action-slot number; type `/rogu watch` again to hide slot reports.
+2. Set up an instance such as `/rogu slot1 13`.
+3. Change it with `/rogu chance1 40` and `/rogu timer1 10`.
+4. Add an available native WoW token with `/rogu emote LAUGH`, then run `/rogu emote list` to see its assigned ID.
+5. Use `/rogu emote1 <id>` to include that ID in instance 1, or `/rogu emote1 list` to inspect the pool.
 
-  * Default: **0.5% chance** on any action bar press
-  * Creates rare, emergent moments even outside configured slots
-* Optional reminder system if you have not roared in a while
-* Profile-based configuration per character (Option C profiles)
+The number in `slot1`, `chance1`, `timer1` and `emote1` is the **configuration instance ID**, not the physical action-slot number. Multiple instances are supported; each has its own `slot`, `chance`, `cd`, `last`, and `emoteIDs`. Instances may share one physical slot and can then both attempt an emote from one press. Configuring an instance resets its cooldown gate.
 
-━━━━━━━━━━━━━━━━━━
+The shared emote database starts with **ROAR** at ID 1. The instance's emote IDs refer to this **account-wide list**; instances, enabled state, fallback configuration and statistics are stored in a **per-character profile** under `ROGUDB.profiles`. The code normalizes invalid/empty selections to ID 1, but does not enforce that a previously customized valid ID-1 token must always remain ROAR.
 
-**Design Philosophy**
+### Main commands
 
-RoarGuild is not about optimization.
-It is about *presence*.
+| Command | What it does |
+| --- | --- |
+| `/rogu` or `/rogu help` | Print usage |
+| `/rogu watch` | Toggle action-slot number display |
+| `/rogu slotX <slot>` | Create/retarget numbered instance X |
+| `/rogu chanceX <0-100>` | Per-instance percent chance |
+| `/rogu timerX <seconds>` | Per-instance interval |
+| `/rogu emote <TOKEN>` / `emote list` | Register or list master emote tokens and IDs |
+| `/rogu emoteX <id>` / `-<id>` / `clear` / `list` | Add, remove, reset, or show an instance's tokens |
+| `/rogu fallback chance <0-1000>` | Set the global fallback chance **in thousandths** |
+| `/rogu fallback timer <seconds>` | Set the fallback's minimum interval |
+| `/rogu info` | Display version, profile, stats, fallback and instance settings |
+| `/rogu resetcd` | Reset instance/fallback cooldown gates and session reminder times |
+| `/rogu reset` | Clear all configured instances |
+| `/rogu on` / `off` | Globally enable/disable automatic emote triggers |
+| `/rogu roar` | Perform the built-in **ROAR** token immediately |
+| `/rogu rexp` | Display rested XP as up to 30 bubbles |
+| `/rogu invite` or `/rogu invite <1-10>` | Send randomized ROAR recruiting text to a numbered chat channel |
 
-It treats your character as a living participant in the world. Emotes happen because you act.
+**Timing:** For configured instances, the cooldown timestamp advances *before* the chance roll, so a failed roll still consumes an interval. The separate global fallback defaults to **5/1000 = 0.5% per eligible press**, with a **2-second** throttle after a successful fallback only. It considers action-slot IDs 1–200 and may also act on configured buttons. The fallback does not run if the addon is disabled. The manual `/rogu roar` command deliberately always uses **ROAR**, independent of instance emote settings.
 
-The system is intentionally lightweight, transparent, and predictable where it matters, and slightly chaotic where it adds charm.
+**Other session behavior:** After a successful emote, the addon may print “You have not roared in a while.” once **420 seconds** have elapsed without another recorded emote, then throttles repeated reminders by **73 seconds**, checking only on subsequent action presses. It also tracks per-character lifetime emote count and a rolling-hour rate, reporting on activity after an elapsed hour. These are emote events tracked by the addon, not combat or performance metrics.
 
-━━━━━━━━━━━━━━━━━━
+## Social and recruitment messages
 
-**RoarGuild Slash Commands** (`/rogu`)
+`/rogu invite` chooses one of the curated, welcoming ROAR messages and sends it to a **numeric channel index** (default 1; inputs clamped to 1–10). The README historically called this “General,” but **channel 1 is not verified to be General** on every client/configuration. Check the channel before sending. This is an explicit command, not an automatic advertisement loop.
 
-**Slot & Timing**
+The messages emphasize exploration, shared stories, curiosity and respect rather than DPS, meters, or pressure. They represent the creator's guild-facing tone.
 
-* `/rogu slotX <slot>` — assign action bar slot to instance X
-* `/rogu chanceX <0–100>` — trigger chance for instance X
-* `/rogu timerX <seconds>` — cooldown for instance X
-* `/rogu resetcd` — reset all instance and fallback cooldown timers
+## Roarboard: a shared message board
 
-**Emote System**
+Roarboard was added in **August 2026**, providing a small in-game post list and reaction interaction:
 
-* `/rogu emote <TOKEN>` — add emote to the master emote list
-* `/rogu emote list` — list all emotes with IDs
-* `/rogu emoteX <id>` — add emote ID to instance X
-* `/rogu emoteX -<id>` — remove emote ID from instance X
-* `/rogu emoteX clear` — reset instance X to default ROAR
-* `/rogu emoteX list` — list emotes assigned to instance X
+| Command / action | Outcome |
+| --- | --- |
+| `/roarboard` | Open a movable board with a **12-row** paged list and selected post detail |
+| `/roarboard <message>` | Send a new post of up to **180 bytes** of string length |
+| `/roarboard sync` | Broadcast a request for other connected clients to resend their cached posts |
+| Click **Roar** | Send a reaction event, increase the visible count and refresh that post's last-activity timestamp |
+| **Newer / Older** | Page through available cached posts |
 
-**Control & Info**
+Posts are retained in a local SavedVariables cache and pruned **seven days after their last recorded activity**. The board communicates using a normal custom WoW chat channel named **`roarboard`** and a simple `RB1` text protocol; there is **no external server or authenticated guild-only backend**.
 
-* `/rogu watch` — print pressed action bar slot numbers
-* `/rogu info` — detailed overview of all instances and fallback
-* `/rogu reset` — remove all configured instances
-* `/rogu on` / `/rogu off` — enable or disable RoarGuild
-* `/rogu roar` — manually trigger instance 1
-* `/rogu rexp` — display rested XP in bubbles (max 30)
-* `/rogu invite` — send a random guild recruitment message to General
+**Important visibility and trust limitation:** The channel is not checked against actual guild membership. Others able to join or send in the matching custom channel may potentially read or forge board messages, and each client keeps its own cache. Board content is **not private guild storage**, guaranteed delivery or a globally consistent database. This limitation should be considered before posting private guild information.
 
-━━━━━━━━━━━━━━━━━━
+## Historical scope
 
-**Quick Setup Example**
+The January 2026 first version combined a ROARRunlimited-like emote system with a **GodBod microexercise** component and two slash commands. The later January 2026 versions **removed GodBod**, expanded the profile/emote/fallback/recruitment functionality and matured the standalone RoarGuild scope. Roarboard added a shared community layer in August. These steps are documented from commits, not an invented conversation.
 
-1. `/rogu watch`
-2. Press the action bar slot you want to react to
-3. `/rogu slot1 <slot>`
-4. `/rogu emote LAUGH`
-5. `/rogu emote1 2`
-6. `/rogu chance1 40`
-7. `/rogu timer1 10`
-8. `/rogu on`
-
-Result:
-A 40% chance to LAUGH when that action is used, with a 10-second cooldown.
-
-━━━━━━━━━━━━━━━━━━
-
-**Profiles & Saved Variables**
-
-* Each character has its own profile stored in `ROGUDB`
-* Profiles are keyed by `Character-Realm`
-* Emote definitions are shared account-wide
-* Slot instances, fallback settings, and enabled state are per character
-* Legacy configurations are migrated automatically on first login
-
-━━━━━━━━━━━━━━━━━━
-
-**What RoarGuild Is Not**
-
-* Not a DPS tool
-* Not a combat automation addon
-* Not a macro replacement
-
-It exists purely to add texture, timing, and personality to moment-to-moment play.
-
-━━━━━━━━━━━━━━━━━━
-
-**Guiding Thought**
-
-**Characters are not loadouts.**
-**They are stories in motion.**
-
-More info and discussion:
-https://discord.gg/7J2QvXCMdE
+The project has an existing **MIT LICENSE** credited to Babuni.dev. This documentation review did **not** modify Lua, TOC or license, perform client tests, or merge the related `roar`, `roarr`, `ROARRunlimited`, and `WorkThatGodBod` repositories.
 
 ## Development documentation
 
-- [Concept](CONCEPT.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
-- [Architecture](docs/ARCHITECTURE.md) · [Design evidence](docs/DECISIONS.md) · [Development journal](docs/DEVLOG.md)
-- [AI collaborator rules](AGENTS.md)
-
-The development journal distinguishes original author direction, source-based reconstruction, AI assistance, and independently verified behavior.
+- [Creative concept](CONCEPT.md) · [Interaction design](docs/DESIGN.md) · [Content and tone](docs/CONTENT.md)
+- [Architecture and protocol](docs/ARCHITECTURE.md) · [Decision record](docs/DECISIONS.md) · [Narrative journal](docs/DEVLOG.md)
+- [Roadmap and verification](ROADMAP.md) · [Changelog](CHANGELOG.md)
+- [AI collaboration and attribution](docs/AI_COLLABORATION.md) · [Contributor instructions](AGENTS.md)
